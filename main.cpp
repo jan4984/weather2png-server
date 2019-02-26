@@ -4,7 +4,10 @@
 #include <pistache/net.h>
 #include <pistache/http.h>
 #include <pistache/endpoint.h>
+//WTF https://stackoverflow.com/questions/3002101/how-can-i-violate-encapsulation-property
+#define private public
 #include <pngwriter.h>
+#undef private
 #include <fstream>
 
 #include <curl/curl.h>
@@ -13,8 +16,8 @@ using namespace Pistache;
 using namespace Pistache::Http;
 static char* fontPath = "./msyh.ttf";
 
-static const int width = 1072;
-static const int height = 1448;
+static const int width = 600;
+static const int height = 800;
 static void pngError(ResponseStream& writer, const std::string& error){
     char pngFileNameBuf[512];
     auto pngFileNamePtr = std::tmpnam(pngFileNameBuf);
@@ -28,6 +31,7 @@ static void pngError(ResponseStream& writer, const std::string& error){
 
     {
         pngwriter png(width, height, 1.0, pngFileNamePtr);
+        png.bit_depth_ = 8;
         //if (waitStatus == std::cv_status::timeout) {
 
         //}
