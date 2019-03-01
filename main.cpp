@@ -100,6 +100,7 @@ static void pngWeather(ResponseStream& writer){
     {
         pngwriter png(width, height, 1.0, pngFileNamePtr);
         png.bit_depth_ = 8;
+        png.colortype_ = 4;//not work, pngwriter hard coded
 
         //时间
         sprintf(nowTimeBuffer, "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
@@ -139,6 +140,8 @@ static void pngWeather(ResponseStream& writer){
         png.close();
     }
 
+    //rgb to gray
+    std::system((std::string() + "convert " + pngFileNamePtr + " -type GrayScale -depth 8 -colors 256 " + pngFileNamePtr).c_str());
     {
         char pngFileBuf[4096];
         std::ifstream f(pngFileNamePtr, std::ios_base::binary | std::ios_base::in);
