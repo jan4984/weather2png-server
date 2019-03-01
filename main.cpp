@@ -104,14 +104,15 @@ static void pngWeather(ResponseStream& writer){
 
         //时间
         sprintf(nowTimeBuffer, "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_min);
-        png.plot_text_utf8(fontPath, 80, 50, 700, 0., nowTimeBuffer, 0., 0., 0.);
+        png.plot_text_utf8(fontPath, 80, 10, 700, 0., nowTimeBuffer, 0., 0., 0.);
         //日期
         auto weekdayName = mapOfWeekdayName[timeinfo->tm_wday - 1];
         sprintf(nowTimeBuffer, weekdayName, timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday);
-        png.plot_text_utf8(fontPath, 40, 90, 620, 0., nowTimeBuffer, 0., 0., 0.);
+        png.plot_text_utf8(fontPath, 30, 140, 620, 0., nowTimeBuffer, 0., 0., 0.);
         //当前天气
         sprintf(nowTimeBuffer, "%s %s", live.weather.c_str(), live.temperature.c_str());
         png.plot_text_utf8(fontPath, 40, 350, 700, 0., nowTimeBuffer, 0., 0., 0.);
+        png.plot_text_utf8(fontPath, 24, 10, 620, 0., (char*)live.aqi.c_str(), 0., 0., 0.);
 
         //分割线
         png.line_blend(0, 600, 600, 600, 1.0, 0., 0., 0.);
@@ -232,20 +233,20 @@ static void getWeather(const std::string &city, ResponseStream &writer) {
             }
             live.wind = std::string(liveObj["direct"].GetString()) + " " + liveObj["power"].GetString();
 
-            auto tomorrowObj = doc["result"].GetObject()["future"].GetArray()[0].GetObject();
+            auto tomorrowObj = doc["result"].GetObject()["future"].GetArray()[1].GetObject();
             tomorrow.temperature = tomorrowObj["temperature"].GetString();
             tomorrow.weather = tomorrowObj["weather"].GetString();
 
-            auto houtianObj = doc["result"].GetObject()["future"].GetArray()[1].GetObject();
+            auto houtianObj = doc["result"].GetObject()["future"].GetArray()[2].GetObject();
             houtian.temperature = houtianObj["temperature"].GetString();
             houtian.weather = houtianObj["weather"].GetString();
 
-            auto dahoutianObj = doc["result"].GetObject()["future"].GetArray()[2].GetObject();
+            auto dahoutianObj = doc["result"].GetObject()["future"].GetArray()[3].GetObject();
             dahoutian.temperature = dahoutianObj["temperature"].GetString();
             dahoutian.weather = dahoutianObj["weather"].GetString();
             dahoutian.date = dahoutianObj["date"].GetString();
 
-            auto dadahoutianObj = doc["result"].GetObject()["future"].GetArray()[3].GetObject();
+            auto dadahoutianObj = doc["result"].GetObject()["future"].GetArray()[4].GetObject();
             dadahoutian.temperature = dadahoutianObj["temperature"].GetString();
             dadahoutian.weather = dadahoutianObj["weather"].GetString();
             dadahoutian.date = dadahoutianObj["date"].GetString();
