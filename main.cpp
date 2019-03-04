@@ -81,7 +81,7 @@ struct Forecast{
     std::string date;
 };
 
-Live live;
+Live live = {.weather = ""};
 Forecast tomorrow;
 Forecast houtian;
 Forecast dahoutian;
@@ -268,21 +268,24 @@ HTTP_PROTOTYPE(HelloHandler)
         }
 
         if(req.resource() == "/time") {
-            auto stream = writer.stream(Http::Code::Ok);
-            getWeather("", stream);
-            return;
-        }
-
-        if(req.resource() == "/weather") {
-            auto q = req.query();
-            if(q.has("city")){
-                auto city = q.get("city").get();
-                std::vector<char> png;
-                writer.headers().add<Header::ContentType>(MIME(Image, Png));
+            if(live.weather != "") {
                 auto stream = writer.stream(Http::Code::Ok);
-                getWeather(city, stream);
+                getWeather("", stream);
                 return;
             }
+        }
+
+        if(req.resource() == "/weather" || live.weather == "") {
+            auto q = req.query();
+            std::string city(std::getenv("CITY"));
+            if(q.has("city")) {
+                city = q.get("city").get();
+            }
+            std::vector<char> png;
+            writer.headers().add<Header::ContentType>(MIME(Image, Png));
+            auto stream = writer.stream(Http::Code::Ok);
+            getWeather(city, stream);
+            return;
         }
 
         writer.send(Http::Code::Not_Found);
@@ -294,6 +297,10 @@ static void my_handler(int s);
 Endpoint endpoint("*:9080");
 
 int main() {
+    if(!getenv("API_KEY") || !getenv("CITY")) {
+        printf("define API_KEY and CITY envirement variable\n");
+        return 0;
+    }
     struct sigaction sigIntHandler;
 
     sigIntHandler.sa_handler = my_handler;
