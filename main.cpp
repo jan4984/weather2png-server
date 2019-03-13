@@ -187,6 +187,7 @@ static void getWeather(const std::string &city, ResponseStream &writer) {
     curl_easy_setopt(curlH, CURLOPT_WRITEFUNCTION, curl_write_cb);
     curl_easy_setopt(curlH, CURLOPT_WRITEDATA, &strStream);
     auto res = curl_easy_perform(curlH);
+    curl_easy_cleanup(curlH);
     if(res == CURLE_OK){
         long rspCode = 0;
         curl_easy_getinfo(curlH, CURLINFO_RESPONSE_CODE, &rspCode);
