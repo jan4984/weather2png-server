@@ -45,7 +45,7 @@ static void pngError(ResponseStream& writer, const std::string& error){
 
         sprintf(nowTimeBuffer, "%02d:%02d", timeinfo->tm_hour, timeinfo->tm_sec);
         png.plot_text_utf8(fontPath, 80, 150, 700, 0., nowTimeBuffer, 0., 0., 0.);
-        auto weekdayName = mapOfWeekdayName[timeinfo->tm_wday - 1];
+        auto weekdayName = mapOfWeekdayName[(timeinfo->tm_wday + 6) % 7];
         sprintf(nowTimeBuffer, weekdayName, timeinfo->tm_mon + 1, timeinfo->tm_mday);
         png.plot_text_utf8(fontPath, 40, 120, 620, 0., nowTimeBuffer, 0., 0., 0.);
 
