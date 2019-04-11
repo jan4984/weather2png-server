@@ -13,6 +13,7 @@ import (
 type wiTTL struct {
 	wi weather2png.WeatherInfo
 	at time.Time
+	png *weather2png.PngWriter
 }
 
 var weakDays = [7]string{"天", "一", "二", "三", "四", "五", "六"}
@@ -67,7 +68,6 @@ func main() {
 	if os.Getenv("TTF_PATH") == "" {
 		panic("env TTF_PATH not defined")
 	}
-	var png = weather2png.NewPngWriter(600, 800, os.Getenv("TTF_PATH"))
 	wis := sync.Map{}
 	http.HandleFunc("/update", func(writer http.ResponseWriter, request *http.Request) {
 		params := request.URL.Query()
@@ -78,16 +78,17 @@ func main() {
 				has && time.Now().Unix() < v.(*wiTTL).at.Unix()+1800 && v.(*wiTTL).wi.Err == "" {
 				//has info and live and not error
 				wi := v.(*wiTTL).wi
-				draw(png, &wi, writer)
+				draw(v.(*wiTTL).png, &wi, writer)
 				return
 			}
 			wi := weather2png.FetchWeather(city)
-			wis.Store(city, &wiTTL{wi, time.Now()})
+			png := weather2png.NewPngWriter(600, 800, os.Getenv("TTF_PATH"))
+			wis.Store(city, &wiTTL{wi, time.Now(), png})
 			draw(png, &wi, writer)
 			return
 		}
 
-		draw(png, &weather2png.WeatherInfo{
+		draw(weather2png.NewPngWriter(600, 800, os.Getenv("TTF_PATH")), &weather2png.WeatherInfo{
 			Err: "未指定城市",
 		}, writer)
 	})

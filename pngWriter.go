@@ -45,6 +45,9 @@ func NewPngWriter(w, h int, fontPath string) *PngWriter {
 
 func (thiz *PngWriter) Reset(writer io.Writer) {
 	img := image.NewGray(image.Rectangle{image.Point{0, 0,}, image.Point{thiz.width, thiz.height}})
+	for i,_ := range img.Pix{
+		img.Pix[i] = 0xff
+	}
 	thiz.cxt.SetDst(img)
 	png.Encode(writer, thiz.img)
 	thiz.img = img
