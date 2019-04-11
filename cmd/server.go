@@ -21,14 +21,14 @@ func draw(png *weather2png.PngWriter, wi *weather2png.WeatherInfo, writer io.Wri
 	defer func() {
 		png.Reset(writer)
 	}()
-	now := time.Now()
+	now := time.Now().UTC().Add(time.Hour * 8)
 
 	png.Text(wi.Today.Wind, 10, 40, 30)
 	png.Text(wi.Today.Weather, 600-utf8.RuneCount([]byte(wi.Today.Weather))*30, 40, 30)
 	png.VerticalLine(0, 50, 600)
 	startY := 150
 	y := startY
-	png.Text(now.Format("03:04"), 20, y, 100)
+	png.Text(now.Format("15:04"), 20, y, 100)
 	y += 60
 	png.Text(now.Format("2006-1-2 星期"+weakDays[now.Weekday()]), 220, y, 40)
 	y += 20

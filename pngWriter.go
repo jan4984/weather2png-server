@@ -31,9 +31,12 @@ func NewPngWriter(w, h int, fontPath string) *PngWriter {
 
 	font, err := truetype.Parse(fontData)
 	img := image.NewGray(image.Rectangle{image.Point{0, 0,}, image.Point{w, h}})
+	for i,_ := range img.Pix{
+		img.Pix[i] = 0xff
+	}
 	freetypeCxt := freetype.NewContext()
 	freetypeCxt.SetDst(img)
-	freetypeCxt.SetSrc(image.NewUniform(color.White))
+	freetypeCxt.SetSrc(image.NewUniform(color.Black))
 	freetypeCxt.SetFont(font)
 	freetypeCxt.SetClip(img.Bounds())
 
@@ -49,8 +52,8 @@ func (thiz *PngWriter) Reset(writer io.Writer) {
 
 func (thiz *PngWriter) VerticalLine(x1, y, x2 int) {
 	for x := x1; x < x2; x++ {
-		thiz.img.Set(x, y, color.White)
-		thiz.img.Set(x, y+1, color.White)
+		thiz.img.Set(x, y, color.Black)
+		thiz.img.Set(x, y+1, color.Black)
 	}
 }
 
