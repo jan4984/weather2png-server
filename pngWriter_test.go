@@ -1,4 +1,4 @@
-package weather2png
+package weather2png_server
 
 import (
 	"testing"

@@ -1,14 +1,16 @@
-package weather2png
+package weather2png_server
 
 import (
 	"image"
 	"image/color"
-	"github.com/golang/freetype/truetype"
-	"io/ioutil"
-	"github.com/golang/freetype"
-	"log"
-	"io"
 	"image/png"
+	"io"
+	"io/ioutil"
+	"log"
+	"sync"
+
+	"github.com/golang/freetype"
+	"github.com/golang/freetype/truetype"
 )
 
 type PngWriter struct {
@@ -23,15 +25,25 @@ type PngWriter struct {
 	//infoSize int
 }
 
+var fontLoadOnce = sync.Once{}
+var font *truetype.Font
+
 func NewPngWriter(w, h int, fontPath string) *PngWriter {
-	fontData, err := ioutil.ReadFile(fontPath)
-	if err != nil {
-		panic(err)
+	if font == nil {
+		fontLoadOnce.Do(func() {
+			if font == nil {
+				fontData, err := ioutil.ReadFile(fontPath)
+				if err != nil {
+					panic(err)
+				}
+
+				font, err = truetype.Parse(fontData)
+			}
+		})
 	}
 
-	font, err := truetype.Parse(fontData)
-	img := image.NewGray(image.Rectangle{image.Point{0, 0,}, image.Point{w, h}})
-	for i,_ := range img.Pix{
+	img := image.NewGray(image.Rectangle{image.Point{0, 0}, image.Point{w, h}})
+	for i, _ := range img.Pix {
 		img.Pix[i] = 0xff
 	}
 	freetypeCxt := freetype.NewContext()
@@ -44,8 +56,8 @@ func NewPngWriter(w, h int, fontPath string) *PngWriter {
 }
 
 func (thiz *PngWriter) Reset(writer io.Writer) {
-	img := image.NewGray(image.Rectangle{image.Point{0, 0,}, image.Point{thiz.width, thiz.height}})
-	for i,_ := range img.Pix{
+	img := image.NewGray(image.Rectangle{image.Point{0, 0}, image.Point{thiz.width, thiz.height}})
+	for i, _ := range img.Pix {
 		img.Pix[i] = 0xff
 	}
 	thiz.cxt.SetDst(img)

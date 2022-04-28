@@ -1,24 +1,18 @@
 package main
 
 import (
-	"github.com/jan4984/weather2png"
-	"net/http"
-	"sync"
-	"time"
 	"io"
+	"net/http"
 	"os"
+	"time"
 	"unicode/utf8"
-)
 
-type wiTTL struct {
-	wi weather2png.WeatherInfo
-	at time.Time
-	png *weather2png.PngWriter
-}
+	weather2png_server "github.com/jan4984/weather2png-server"
+)
 
 var weakDays = [7]string{"天", "一", "二", "三", "四", "五", "六"}
 
-func draw(png *weather2png.PngWriter, wi *weather2png.WeatherInfo, writer io.Writer) {
+func draw(png *weather2png_server.PngWriter, wi *weather2png_server.WeatherInfo, writer io.Writer) {
 	defer func() {
 		png.Reset(writer)
 	}()
@@ -34,9 +28,9 @@ func draw(png *weather2png.PngWriter, wi *weather2png.WeatherInfo, writer io.Wri
 	png.Text(now.Format("2006-1-2 星期"+weakDays[now.Weekday()]), 220, y, 40)
 	y += 20
 	png.VerticalLine(0, y, 600)
-	if wi.Err != "" {
+	if wi.Err != nil {
 		png.Text("错误!", 10, 200, 40)
-		png.Text(wi.Err, 10, 300, 40)
+		png.Text(wi.Err.Error(), 10, 300, 40)
 		return
 	}
 	png.Text(wi.Live.Weather+" "+wi.Live.Temperature+"℃", 300, startY, 50)
@@ -65,34 +59,22 @@ func draw(png *weather2png.PngWriter, wi *weather2png.WeatherInfo, writer io.Wri
 }
 
 func main() {
-	if os.Getenv("TTF_PATH") == "" {
-		panic("env TTF_PATH not defined")
-	}
-	wis := sync.Map{}
+	weather2png_server.Start()
+	// time.Sleep(time.Second * 5)
+	// f, _ := os.Create("out.png")
+	// png := weather2png_server.NewPngWriter(600, 800, os.Getenv("TTF_PATH"))
+	// wi := weather2png_server.Get("101020500")
+	// draw(png, &wi, f)
 	http.HandleFunc("/update", func(writer http.ResponseWriter, request *http.Request) {
 		params := request.URL.Query()
 		writer.Header().Set("Content-Type", "image/png")
-		if v, has := params["city"]; has {
-			city := v[0]
-			if v, has := wis.Load(city);
-				has && time.Now().Unix() < v.(*wiTTL).at.Unix()+1800 && v.(*wiTTL).wi.Err == "" {
-				//has info and live and not error
-				wi := v.(*wiTTL).wi
-				draw(v.(*wiTTL).png, &wi, writer)
-				return
-			}
-			wi := weather2png.FetchWeather(city)
-			png := weather2png.NewPngWriter(600, 800, os.Getenv("TTF_PATH"))
-			wis.Store(city, &wiTTL{wi, time.Now(), png})
-			draw(png, &wi, writer)
-			return
+		city := os.Getenv("LOCATION_ID")
+		if city == "" {
+			city = params.Get("city")
 		}
-
-		draw(weather2png.NewPngWriter(600, 800, os.Getenv("TTF_PATH")), &weather2png.WeatherInfo{
-			Err: "未指定城市",
-		}, writer)
+		wi := weather2png_server.Get(city)
+		png := weather2png_server.NewPngWriter(600, 800, os.Getenv("TTF_PATH"))
+		draw(png, &wi, writer)
 	})
-
 	http.ListenAndServe(":10008", nil)
-
 }

@@ -1,15 +1,15 @@
-package weather2png
+package weather2png_server
 
 import (
-	"github.com/oliveagle/jsonpath"
-	"os"
-	"net/http"
+	"crypto/tls"
 	"encoding/json"
-	"strings"
-	"errors"
-	"strconv"
+	"fmt"
 	"io/ioutil"
-	"log"
+	"net/http"
+	"net/url"
+	"os"
+	"sync"
+	"time"
 )
 
 type WeatherInfo struct {
@@ -23,99 +23,141 @@ type WeatherInfo struct {
 		Wind    string
 		Weather string
 	}
-	Err string
+	Err error
 }
 
-func FetchWeather(city string) WeatherInfo {
-	retErr := func(err error) WeatherInfo {
-		panic(err)
-		return WeatherInfo{
-			Err: err.Error(),
+var client = http.Client{
+	Timeout: time.Second * 5,
+	//my router outof update for the ca-cert
+	Transport: &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	},
+}
+
+func doReq(path, loc string, params url.Values) (map[string]interface{}, error) {
+	u, err := url.Parse(path)
+	if err != nil {
+		return nil, fmt.Errorf("WRONG URL %s : %w", path, err)
+	}
+	params.Set("key", os.Getenv("HEFENG_APIKEY"))
+	params.Set("location", loc)
+	u.RawQuery = params.Encode()
+
+	resp, err := client.Get(u.String())
+	if err != nil {
+		return nil, fmt.Errorf("GET %s failed:%w", path, err)
+	}
+	defer resp.Body.Close()
+	//reader, err := gzip.NewReader(resp.Body)
+	//defer reader.Close()
+	//respBody, err := ioutil.ReadAll(reader)
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("READ %s failed:%w", path, err)
+	}
+	var doc map[string]interface{}
+	err = json.Unmarshal(respBody, &doc)
+	if err != nil {
+		return nil, fmt.Errorf("UNMARSHAL %s %s failed:%w", path, string(respBody), err)
+	}
+	if doc["code"] != "200" {
+		return nil, fmt.Errorf("WRONG CODE %s %s failed", path, string(respBody))
+	}
+	return doc, nil
+}
+
+var wis = sync.Map{}
+
+func Start() {
+	defaultLoc := os.Getenv("LOCATION_ID")
+	if defaultLoc != "" {
+		wis.Store(defaultLoc, &WeatherInfo{})
+	}
+	go func() {
+		n := int64(0)
+		for {
+			locs := make(map[string]*WeatherInfo)
+			wis.Range(func(key, value any) bool {
+				locs[key.(string)] = value.(*WeatherInfo)
+				return true
+			})
+			for loc, wi := range locs {
+				wi.Err = realtime(loc, wi)
+				if wi.Err != nil {
+					fmt.Println(loc, wi.Err)
+				}
+			}
+			for loc, wi := range locs {
+				if wi.Today.Weather == "" {
+					wi.Err = threeDays(loc, wi)
+				} else if n%(30*60) == 0 {
+					wi.Err = threeDays(loc, wi)
+				}
+				if wi.Err != nil {
+					fmt.Println(loc, wi.Err)
+				}
+			}
+			time.Sleep(time.Second * 5)
+			n = n + 5
+		}
+	}()
+}
+
+func Get(loc string) WeatherInfo {
+	wi := WeatherInfo{}
+	wiAny, has := wis.LoadOrStore(loc, &wi)
+	if !has {
+		time.Sleep(time.Second * 6)
+	}
+
+	return *wiAny.(*WeatherInfo)
+}
+
+func realtime(loc string, wi *WeatherInfo) error {
+	doc, err := doReq("https://devapi.qweather.com/v7/weather/now", loc, url.Values{})
+	if err != nil {
+		return err
+	}
+	doc = doc["now"].(map[string]interface{})
+	wi.Live.Temperature = doc["temp"].(string)
+	wi.Live.Weather = doc["text"].(string)
+	//wi.Live.Wind = doc["windDir"].(string) + doc["windScale"].(string) + "级"
+
+	doc, err = doReq("https://devapi.qweather.com/v7/air/now", loc, url.Values{})
+	if err != nil {
+		return err
+	}
+	doc = doc["now"].(map[string]interface{})
+	wi.Live.Aqi = doc["category"].(string)
+	return nil
+}
+
+func threeDays(loc string, wi *WeatherInfo) error {
+	doc, err := doReq("https://devapi.qweather.com/v7/weather/7d", loc, url.Values{})
+	if err != nil {
+		return err
+	}
+	doc0 := doc["daily"].([]interface{})[0].(map[string]interface{})
+	doc1 := doc["daily"].([]interface{})[1].(map[string]interface{})
+	doc2 := doc["daily"].([]interface{})[2].(map[string]interface{})
+	doc3 := doc["daily"].([]interface{})[3].(map[string]interface{})
+	doc4 := doc["daily"].([]interface{})[4].(map[string]interface{})
+	for _, doc = range []map[string]interface{}{doc0, doc1, doc2, doc3, doc4} {
+		if doc["textDay"] == doc["textNight"] {
+			doc["textNight"] = ""
+		} else {
+			doc["textNight"] = fmt.Sprintf("-%v", doc["textNight"])
 		}
 	}
-	apikey := os.Getenv("JUHE_APIKEY")
-	if apikey == "" {
-		return retErr(errors.New("没有定义JUHE API KEY"))
-	}
-	rsp, err := http.Get("http://apis.juhe.cn/simpleWeather/query?key=" + apikey + "&city=" + city)
-	if err != nil {
-		return retErr(err)
-	}
-
-	defer rsp.Body.Close()
-	rspTxt, _ := ioutil.ReadAll(rsp.Body)
-	log.Println("rsp:", string(rspTxt))
-	var doc interface{}
-	err = json.Unmarshal(rspTxt, &doc)
-	if err != nil {
-		return retErr(err)
-	}
-
-	v, err := jsonpath.JsonPathLookup(doc, "$.reason")
-	if err != nil {
-		return retErr(err)
-	}
-
-	if vv, ok := v.(string); ok != true || !strings.Contains(vv, "查询成功") {
-		return retErr(errors.New("查询结果：" + vv))
-	}
-
-	wi := WeatherInfo{}
-
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.realtime.temperature")
-	wi.Live.Temperature = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.realtime.info")
-	wi.Live.Weather = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.realtime.aqi")
-	vv, _ := strconv.ParseInt(v.(string), 10, 32)
-	if (vv <= 50) {
-		wi.Live.Aqi = "空气优"
-	} else if (vv < 100) {
-		wi.Live.Aqi = "空气良"
-	} else if (vv < 200) {
-		wi.Live.Aqi = "轻度污染"
-	} else if (vv < 300) {
-		wi.Live.Aqi = "中度污染"
-	} else {
-		wi.Live.Aqi = "重度污染"
-	}
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.realtime.direct")
-	wi.Today.Wind = v.(string);
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.realtime.power")
-	wi.Today.Wind += v.(string)
-
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[0].weather")
-	wi.Today.Weather = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[0].temperature")
-	wi.Today.Weather += " " + v.(string)
-
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[1].temperature")
-	wi.Tomorrow.Temperature = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[1].weather")
-	wi.Tomorrow.Weather = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[1].date")
-	wi.Tomorrow.Date = v.(string)
-
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[2].temperature")
-	wi.Houtian.Temperature = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[2].weather")
-	wi.Houtian.Weather = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[2].date")
-	wi.Houtian.Date = v.(string)
-
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[3].temperature")
-	wi.Dahoutian.Temperature = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[3].weather")
-	wi.Dahoutian.Weather = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[3].date")
-	wi.Dahoutian.Date = v.(string)
-
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[4].temperature")
-	wi.Dadahoutian.Temperature = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[4].weather")
-	wi.Dadahoutian.Weather = v.(string)
-	v, _ = jsonpath.JsonPathLookup(doc, "$.result.future[4].date")
-	wi.Dadahoutian.Date = v.(string)
-
-	return wi
+	wi.Today.Weather = fmt.Sprintf("%v%v %v/%v℃", doc0["textDay"], doc0["textNight"], doc0["tempMin"], doc0["tempMax"])
+	wi.Today.Wind = fmt.Sprintf("%v%v级", doc0["windDirDay"], doc0["windScaleDay"])
+	wi.Tomorrow.Weather = fmt.Sprintf("%v%v %v/%v℃", doc1["textDay"], doc1["textNight"], doc1["tempMin"], doc1["tempMax"])
+	wi.Tomorrow.Date = doc1["fxDate"].(string)
+	wi.Houtian.Weather = fmt.Sprintf("%v%v %v/%v℃", doc2["textDay"], doc2["textNight"], doc2["tempMin"], doc2["tempMax"])
+	wi.Houtian.Date = doc2["fxDate"].(string)
+	wi.Dahoutian.Weather = fmt.Sprintf("%v%v %v/%v℃", doc3["textDay"], doc3["textNight"], doc3["tempMin"], doc3["tempMax"])
+	wi.Dahoutian.Date = doc3["fxDate"].(string)
+	wi.Dadahoutian.Weather = fmt.Sprintf("%v%v %v/%v℃", doc4["textDay"], doc4["textNight"], doc4["tempMin"], doc4["tempMax"])
+	wi.Dadahoutian.Date = doc4["fxDate"].(string)
+	return nil
 }
