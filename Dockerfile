@@ -10,7 +10,7 @@ RUN GOARCH=arm64 GOOS=linux go build -o server cmd/server.go
 
 FROM arm64v8/alpine:latest
 WORKDIR /app
-COPY --from=builder /build/resources/msyh.tff ./
+COPY --from=builder /build/resources/msyh.ttf ./
 COPY --from=builder /build/server ./
 ENV LOCATION_ID=101020500
 ENV TTF_PATH=msyh.tff
