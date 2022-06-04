@@ -90,15 +90,15 @@ func Start() {
 			for loc, wi := range locs {
 				if wi.Today.Weather == "" {
 					wi.Err = threeDays(loc, wi)
-				} else if n%(30*60) == 0 {
+				} else if n%(10*60) == 0 {
 					wi.Err = threeDays(loc, wi)
 				}
 				if wi.Err != nil {
 					fmt.Println(loc, wi.Err)
 				}
 			}
-			time.Sleep(time.Second * 5)
-			n = n + 5
+			time.Sleep(time.Minute)
+			n = n + 60
 		}
 	}()
 }
