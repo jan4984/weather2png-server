@@ -27,7 +27,7 @@ type WeatherInfo struct {
 }
 
 var client = http.Client{
-	Timeout: time.Second * 5,
+	Timeout: time.Second * 20,
 	//my router outof update for the ca-cert
 	Transport: &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
