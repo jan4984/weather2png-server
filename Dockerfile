@@ -13,7 +13,7 @@ WORKDIR /app
 COPY --from=builder /build/resources/msyh.ttf ./
 COPY --from=builder /build/server ./
 ENV LOCATION_ID=101020500
-ENV TTF_PATH=msyh.tff
+ENV TTF_PATH=msyh.ttf
 ENV HEFENG_APIKEY="hide"
 EXPOSE 10008
 CMD ["./server"]
