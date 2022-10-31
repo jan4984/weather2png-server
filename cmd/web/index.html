@@ -1,0 +1,12 @@
+<html>
+    <body>
+        <img src="/update" id="img"></img>
+    </body>
+    <script>
+        let acc=0;
+        setInterval(()=>{
+            acc++;
+            document.querySelector('#img').src="/update?interval="+acc;
+        }, 15 * 1000)
+    </script>
+</html>

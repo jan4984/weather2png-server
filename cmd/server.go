@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"io"
 	"net/http"
 	"os"
@@ -58,6 +59,9 @@ func draw(png *weather2png_server.PngWriter, wi *weather2png_server.WeatherInfo,
 	y += 80
 }
 
+//go:embed web
+var res embed.FS
+
 func main() {
 	weather2png_server.Start()
 	// time.Sleep(time.Second * 5)
@@ -76,5 +80,6 @@ func main() {
 		png := weather2png_server.NewPngWriter(600, 800, os.Getenv("TTF_PATH"))
 		draw(png, &wi, writer)
 	})
+	http.Handle("/", http.FileServer(http.FS(res)))
 	http.ListenAndServe(":10008", nil)
 }
